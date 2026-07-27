@@ -6,6 +6,7 @@ const {
   GatewayIntentBits,
   AttachmentBuilder,
   PollLayoutType,
+  MessageType,
 } = require('discord.js');
 
 const QUEUE_PATH = path.join(__dirname, 'queue.csv');
@@ -72,9 +73,28 @@ function saveState(state) {
 async function revealPreviousAnswer(client, state) {
   if (!state.pending) return;
 
-  const { channelId, answer } = state.pending;
+  const { channelId, messageId, answer } = state.pending;
   try {
     const channel = await client.channels.fetch(channelId);
+    const pollMessage = await channel.messages.fetch(messageId);
+
+    // Cerramos la encuesta nosotros mismos (si no se había cerrado ya sola)
+    if (pollMessage.poll && !pollMessage.poll.resultsFinalized) {
+      await pollMessage.poll.end();
+    }
+
+    // Discord genera un mensaje automático de tipo "PollResult" cuando la encuesta
+    // termina. No se puede desactivar, pero sí borrarlo. Puede tardar unos segundos
+    // en aparecer, así que esperamos un poco y buscamos entre los mensajes recientes.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const recentMessages = await channel.messages.fetch({ limit: 15 });
+    const resultMessage = recentMessages.find(
+      (m) => m.type === MessageType.PollResult && m.reference?.messageId === messageId
+    );
+    if (resultMessage) {
+      await resultMessage.delete();
+    }
+
     await channel.send(`📊 ¡La encuesta terminó! La alternativa correcta era **${answer}**.`);
   } catch (err) {
     console.error('No se pudo enviar la respuesta correcta del desafío anterior:', err);
