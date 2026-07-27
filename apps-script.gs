@@ -3,11 +3,13 @@
  *  Sincroniza el Google Sheet de desafíos con el bot de Discord.
  *
  *  Cómo funciona:
- *  1. En el Sheet, insertas una imagen "sobre la celda" en la columna A
- *     (menú Insertar > Imagen > Imagen sobre las celdas) en la fila del
- *     desafío, y escribes la letra correcta en la columna B.
+ *  1. En el Sheet, pegas la imagen directo en la celda de la columna A
+ *     (selecciona la celda y Ctrl+V, tal cual — no hace falta usar el menú
+ *     Insertar), y escribes la letra correcta en la columna B.
  *  2. Apenas escribes en la columna B, este script se dispara solo:
- *     - Toma la imagen de esa fila.
+ *     - Toma la imagen de esa fila (soporta tanto una imagen pegada dentro
+ *       de la celda con Ctrl+V, como una imagen insertada "sobre las
+ *       celdas" con el menú Insertar > Imagen, por si la prefieres así).
  *     - La sube directo a tu repositorio de Github (carpeta challenges/).
  *     - Agrega una fila nueva a queue.csv en el mismo repositorio, apuntando
  *       a esa imagen — sin que tengas que abrir Github para nada.
@@ -55,12 +57,13 @@ function procesarFila(sheet, row) {
 
   const imagen = buscarImagenEnFila(sheet, row);
   if (!imagen) {
-    sheet.getRange(row, COL_ESTADO).setValue('⚠️ No encontré una imagen en esta fila');
+    sheet.getRange(row, COL_ESTADO).setValue('⚠️ No encontré una imagen en esta fila (columna A)');
     return;
   }
 
   try {
-    const imageUrl = subirImagenAGithub(imagen.getBlob(), row);
+    const blob = obtenerBlobDeImagen(imagen);
+    const imageUrl = subirImagenAGithub(blob, row);
     agregarFilaAQueue(imageUrl, respuesta);
     sheet.getRange(row, COL_ESTADO).setValue('✅ Publicado');
   } catch (err) {
@@ -68,12 +71,44 @@ function procesarFila(sheet, row) {
   }
 }
 
+/**
+ * Busca la imagen de la fila, soportando dos formas de haberla puesto ahí:
+ *  a) Pegada directo en la celda A con Ctrl+V (queda como un valor tipo
+ *     "CellImage" dentro de la celda).
+ *  b) Insertada "sobre las celdas" con el menú Insertar > Imagen (queda
+ *     como una imagen flotante, ancla en alguna celda de la fila).
+ */
 function buscarImagenEnFila(sheet, row) {
+  // a) Imagen pegada dentro de la celda A (Ctrl+V)
+  const valorCelda = sheet.getRange(row, 1).getValue();
+  if (valorCelda && typeof valorCelda.getContentUrl === 'function') {
+    return { tipo: 'celda', contentUrl: valorCelda.getContentUrl() };
+  }
+
+  // b) Imagen flotante insertada con el menú Insertar > Imagen > Sobre las celdas
   const imagenes = sheet.getImages();
   for (const img of imagenes) {
-    if (img.getAnchorCell().getRow() === row) return img;
+    if (img.getAnchorCell().getRow() === row) {
+      return { tipo: 'flotante', blob: img.getBlob() };
+    }
   }
+
   return null;
+}
+
+/**
+ * Convierte lo que encontró buscarImagenEnFila() en un Blob real, sin
+ * importar si la imagen estaba pegada en la celda o flotante.
+ */
+function obtenerBlobDeImagen(imagen) {
+  if (imagen.tipo === 'celda') {
+    const response = UrlFetchApp.fetch(imagen.contentUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() >= 300) {
+      throw new Error('No pude descargar la imagen pegada en la celda (código ' + response.getResponseCode() + ')');
+    }
+    return response.getBlob();
+  }
+  return imagen.blob;
 }
 
 function getConfig_() {
