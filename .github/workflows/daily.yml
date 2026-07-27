@@ -1,1 +1,63 @@
+name: Publicar desafío diario
 
+on:
+  schedule:
+    # 9:00am hora de Chile continental (actualmente UTC-4) = 13:00 UTC -> publica desafío + encuesta (12h)
+    - cron: "0 13 * * *"
+    # 9:00pm hora de Chile continental = 01:00 UTC del día siguiente -> revela la respuesta correcta
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Modo a ejecutar manualmente'
+        required: true
+        default: 'publish'
+        type: choice
+        options:
+          - publish
+          - reveal
+
+permissions:
+  contents: write # necesario para que el workflow pueda guardar queue.csv y state.json de vuelta al repo
+
+jobs:
+  ejecutar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Determinar modo (publish o reveal)
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 13 * * *" ]; then
+            echo "mode=publish" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=reveal" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ejecutar el bot
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          POLL_DURATION_HOURS: "12"
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: node index.js
+
+      - name: Guardar cambios (queue.csv / state.json)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add queue.csv state.json
+          git diff --quiet --cached || git commit -m "Actualiza cola y estado del desafío diario"
+          git push
