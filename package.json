@@ -1,0 +1,14 @@
+{
+  "name": "discord-daily-challenge",
+  "version": "1.0.0",
+  "description": "Bot que publica un desafio diario (imagen) en Discord con encuesta nativa A/B/C/D y revela la respuesta correcta al día siguiente.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5"
+  }
+}
