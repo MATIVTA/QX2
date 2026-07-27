@@ -152,10 +152,36 @@ async function postNextChallenge(client) {
     },
   });
 
-  // 3) Guardar en el estado que esta encuesta queda pendiente de revelar
+  // 3) Crear un hilo enlazado a la encuesta para que la gente debata ahí
+  const thread = await pollMessage.startThread({
+    name: `Debate - Desafío del ${new Date().toLocaleDateString('es-CL')}`,
+    autoArchiveDuration: 1440, // se archiva solo tras 24h sin actividad
+    reason: 'Hilo de discusión del desafío diario',
+  });
+
+  // Al crear un hilo desde un mensaje, Discord manda un mensaje automático de tipo
+  // "ThreadCreated" ("X ha creado un hilo...") en el canal. No se puede desactivar,
+  // así que lo buscamos entre los mensajes recientes y lo borramos, igual que con
+  // el mensaje de resultado de la encuesta.
+  let threadCreatedMessage = null;
+  for (let intento = 0; intento < 10 && !threadCreatedMessage; intento++) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const recentMessages = await channel.messages.fetch({ limit: 15 });
+    threadCreatedMessage = recentMessages.find(
+      (m) => m.type === MessageType.ThreadCreated && m.id !== pollMessage.id
+    );
+  }
+  if (threadCreatedMessage) {
+    await threadCreatedMessage.delete();
+  } else {
+    console.warn('No apareció el mensaje automático de "hilo creado" tras esperar; se continúa igual.');
+  }
+
+  // 4) Guardar en el estado que esta encuesta queda pendiente de revelar
   state.pending = {
     messageId: pollMessage.id,
     channelId: channel.id,
+    threadId: thread.id,
     answer: next.answer,
   };
   saveState(state);
