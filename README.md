@@ -86,12 +86,13 @@ el código está ahí pero no reacciona a nada.
 
 ### 8. Úsalo
 
-1. En la fila 2 del Sheet: click en la celda A2 → **Insertar → Imagen → Imagen sobre las
-   celdas** → sube tu imagen del desafío, y acomódala sobre esa celda/fila.
+1. En la fila 2 del Sheet: click en la celda **A2** y pega la imagen con **Ctrl+V** — directo,
+   tal cual la copiaste (de internet, de un recorte de pantalla, de donde sea). No necesitas
+   pasar por ningún menú.
 2. En B2, escribe la letra correcta (ej: `C`).
-3. Apenas confirmes esa celda, el script corre solo: sube la imagen a Github y agrega la fila a
-   `queue.csv`. En la columna C vas a ver **"✅ Publicado"** (o un mensaje de error si algo
-   falló, para que sepas qué corregir).
+3. Apenas confirmes esa celda, el script corre solo: toma la imagen pegada, la sube a Github y
+   agrega la fila a `queue.csv`. En la columna C vas a ver **"✅ Publicado"** (o un mensaje de
+   error si algo falló, para que sepas qué corregir).
 4. Repite con cada fila nueva para tus próximos desafíos.
 
 Si algo no se disparó solo (por ejemplo si pegaste la respuesta sin "confirmarla" con Enter/Tab),
