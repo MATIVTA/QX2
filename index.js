@@ -74,36 +74,48 @@ async function revealPreviousAnswer(client, state) {
   if (!state.pending) return;
 
   const { channelId, messageId, answer } = state.pending;
+  const channel = await client.channels.fetch(channelId);
+
+  let pollMessage = null;
   try {
-    const channel = await client.channels.fetch(channelId);
-    const pollMessage = await channel.messages.fetch(messageId);
+    pollMessage = await channel.messages.fetch(messageId);
+  } catch (err) {
+    console.warn(`No se encontró el mensaje de la encuesta (${messageId}), probablemente fue borrado. Se envía igual la respuesta.`);
+  }
 
-    // Cerramos la encuesta nosotros mismos (si no se había cerrado ya sola)
-    if (pollMessage.poll && !pollMessage.poll.resultsFinalized) {
-      await pollMessage.poll.end();
-    }
+  if (pollMessage) {
+    try {
+      // Cerramos la encuesta nosotros mismos (si no se había cerrado ya sola)
+      if (pollMessage.poll && !pollMessage.poll.resultsFinalized) {
+        await pollMessage.poll.end();
+      }
 
-    // Discord genera un mensaje automático de tipo "PollResult" cuando la encuesta
-    // termina. No se puede desactivar, pero sí borrarlo. Puede tardar bastante en
-    // aparecer (no es instantáneo), así que reintentamos varias veces antes de
-    // rendirnos, en vez de esperar una sola vez.
-    let resultMessage = null;
-    for (let intento = 0; intento < 10 && !resultMessage; intento++) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      const recentMessages = await channel.messages.fetch({ limit: 15 });
-      resultMessage = recentMessages.find(
-        (m) => m.type === MessageType.PollResult && m.reference?.messageId === messageId
-      );
+      // Discord genera un mensaje automático de tipo "PollResult" cuando la encuesta
+      // termina. No se puede desactivar, pero sí borrarlo. Puede tardar bastante en
+      // aparecer (no es instantáneo), así que reintentamos varias veces antes de
+      // rendirnos, en vez de esperar una sola vez.
+      let resultMessage = null;
+      for (let intento = 0; intento < 10 && !resultMessage; intento++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const recentMessages = await channel.messages.fetch({ limit: 15 });
+        resultMessage = recentMessages.find(
+          (m) => m.type === MessageType.PollResult && m.reference?.messageId === messageId
+        );
+      }
+      if (resultMessage) {
+        await resultMessage.delete();
+      } else {
+        console.warn('No apareció el mensaje automático de resultado tras esperar; se continúa igual.');
+      }
+    } catch (err) {
+      console.error('Error cerrando/limpiando la encuesta anterior (se envía la respuesta igual):', err);
     }
-    if (resultMessage) {
-      await resultMessage.delete();
-    } else {
-      console.warn('No apareció el mensaje automático de resultado tras esperar; se continúa igual.');
-    }
+  }
 
+  try {
     await channel.send(`📊 ¡La encuesta terminó! La alternativa correcta era **${answer}**.`);
   } catch (err) {
-    console.error('No se pudo enviar la respuesta correcta del desafío anterior:', err);
+    console.error('No se pudo enviar el mensaje con la respuesta correcta:', err);
   }
 
   state.pending = null;
