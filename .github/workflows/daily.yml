@@ -40,7 +40,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "0 13 * * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "0 12 * * *" ]; then
             echo "mode=publish" >> "$GITHUB_OUTPUT"
           else
             echo "mode=reveal" >> "$GITHUB_OUTPUT"
@@ -59,5 +59,27 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add queue.csv state.json
-          git diff --quiet --cached || git commit -m "Actualiza cola y estado del desafío diario"
-          git push
+
+          if git diff --quiet --cached; then
+            echo "Sin cambios que guardar."
+            exit 0
+          fi
+
+          git commit -m "Actualiza cola y estado del desafío diario"
+
+          # Puede que el Apps Script haya escrito en el repo justo mientras
+          # corría este job (ej: alguien editó el Sheet en paralelo). En vez
+          # de fallar, jalamos lo nuevo con rebase y reintentamos el push.
+          intentos=5
+          hasta_que=$intentos
+          while [ $hasta_que -gt 0 ]; do
+            if git pull --rebase origin main && git push; then
+              exit 0
+            fi
+            echo "Push falló, reintentando... ($((intentos - hasta_que + 1))/$intentos)"
+            hasta_que=$((hasta_que - 1))
+            sleep 5
+          done
+
+          echo "No se pudo subir los cambios tras varios intentos."
+          exit 1
