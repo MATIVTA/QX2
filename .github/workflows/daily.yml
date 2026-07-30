@@ -3,7 +3,7 @@ name: Publicar desafío diario
 on:
   schedule:
     # 9:00am hora de Chile continental (actualmente UTC-4) = 13:00 UTC -> publica desafío + encuesta (12h)
-    - cron: "0 12 * * *"
+    - cron: "0 10 * * *"
     # 9:00pm hora de Chile continental = 01:00 UTC del día siguiente -> revela la respuesta correcta
     - cron: "0 0 * * *"
   workflow_dispatch:
