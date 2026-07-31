@@ -2,10 +2,14 @@ name: Publicar desafío diario
 
 on:
   schedule:
-    # 9:00am hora de Chile continental (actualmente UTC-4) = 13:00 UTC -> publica desafío + encuesta (12h)
-    - cron: "0 10 * * *"
-    # 9:00pm hora de Chile continental = 01:00 UTC del día siguiente -> revela la respuesta correcta
-    - cron: "0 0 * * *"
+    # 7:00am hora de Chile continental (actualmente UTC-4, horario de invierno) = 11:00 UTC
+    # -> publica el desafío + abre la encuesta. Usamos minuto 7 (no en punto) para
+    # evitar la congestión que Github suele tener justo a las horas redondas,
+    # que puede sumar bastante retraso.
+    - cron: "7 11 * * *"
+    # 7:00pm hora de Chile continental (12h después, coincide con POLL_DURATION_HOURS)
+    # = 23:00 UTC -> revela la respuesta
+    - cron: "7 23 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -40,7 +44,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "0 12 * * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "7 11 * * *" ]; then
             echo "mode=publish" >> "$GITHUB_OUTPUT"
           else
             echo "mode=reveal" >> "$GITHUB_OUTPUT"
